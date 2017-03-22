@@ -2539,7 +2539,6 @@ static void *bytedup(const void *data, size_t datalen)
       void *final_values_copy = 0;
       size_t final_values_size = 0;
       gasnet_node_t forward_to_node = (gasnet_node_t) -1;
-      gasnet_node_t inform_migration = (gasnet_node_t) -1;
       BarrierStrategy *updated_strategy = 0;
       EventImpl::gen_t updated_strategy_gen = 0;
       
