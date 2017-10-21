@@ -984,6 +984,9 @@ public:
 #endif
                 std::map<Processor, Memory>* proc_sysmems,
                 std::map<Processor, Memory>* proc_regmems);
+  virtual void select_task_options(const MapperContext    ctx,
+                                   const Task&            task,
+                                         TaskOptions&     output);
   virtual void default_policy_rank_processor_kinds(
                                     MapperContext ctx, const Task &task,
                                     std::vector<Processor::Kind> &ranking);
@@ -1041,6 +1044,16 @@ PennantMapper::PennantMapper(MapperRuntime *rt, Machine machine, Processor local
     proc_sysmems(*_proc_sysmems)// ,
     // proc_regmems(*_proc_regmems)
 {
+}
+
+void PennantMapper::select_task_options(const MapperContext    ctx,
+                                        const Task&            task,
+                                              TaskOptions&     output)
+{
+  output.initial_proc = default_policy_select_initial_processor(ctx, task);
+  output.inline_task = false;
+  output.stealable = stealing_enabled;
+  output.memoize = task.has_trace();
 }
 
 void PennantMapper::default_policy_rank_processor_kinds(MapperContext ctx,

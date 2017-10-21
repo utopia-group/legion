@@ -41,6 +41,12 @@ public:
                                     MapperContext ctx,
                                     const Task &task,
                                     std::vector<Processor> &target_procs);
+  virtual LogicalRegion default_policy_select_instance_region(
+                                MapperContext ctx, Memory target_memory,
+                                const RegionRequirement &req,
+                                const LayoutConstraintSet &constraints,
+                                bool force_new_instances, 
+                                bool meets_constraints);
   virtual void map_copy(const MapperContext ctx,
                         const Copy &copy,
                         const MapCopyInput &input,
@@ -87,6 +93,7 @@ void StencilMapper::select_task_options(const MapperContext    ctx,
 #else
   output.map_locally = false;
 #endif
+  output.memoize = task.has_trace();
 }
 
 Processor StencilMapper::default_policy_select_initial_processor(
@@ -101,6 +108,16 @@ void StencilMapper::default_policy_select_target_processors(
                                     std::vector<Processor> &target_procs)
 {
   target_procs.push_back(task.target_proc);
+}
+
+LogicalRegion StencilMapper::default_policy_select_instance_region(
+                              MapperContext ctx, Memory target_memory,
+                              const RegionRequirement &req,
+                              const LayoutConstraintSet &constraints,
+                              bool force_new_instances, 
+                              bool meets_constraints)
+{
+  return req.region;
 }
 
 void StencilMapper::map_copy(const MapperContext ctx,

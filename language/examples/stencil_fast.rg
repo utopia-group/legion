@@ -514,28 +514,29 @@ task main()
   var tprune : int64 = conf.tprune
   var tsteps : int64 = conf.tsteps + 2 * tprune
 
-  -- __demand(__spmd)
-  -- do
-  --   for i = 0, nt2 do
-  --     fill_(pxm_out[i], init)
-  --   end
-  --   for i = 0, nt2 do
-  --     fill_(pxp_out[i], init)
-  --   end
-  --   for i = 0, nt2 do
-  --     fill_(pym_out[i], init)
-  --   end
-  --   for i = 0, nt2 do
-  --     fill_(pyp_out[i], init)
-  --   end
-  -- end
+  --__demand(__spmd)
+  --do
+  --  for i = 0, nt2 do
+  --    fill_(pxm_out[i], init)
+  --  end
+  --  for i = 0, nt2 do
+  --    fill_(pxp_out[i], init)
+  --  end
+  --  for i = 0, nt2 do
+  --    fill_(pym_out[i], init)
+  --  end
+  --  for i = 0, nt2 do
+  --    fill_(pyp_out[i], init)
+  --  end
+  --end
 
   __demand(__spmd)
   do
-    -- for i = 0, nt2 do
-    --   fill_(private[i], init)
-    -- end
+     --for i = 0, nt2 do
+     --  fill_(private[i], init)
+     --end
 
+    __demand(__trace)
     for t = 0, tsteps do
       -- __demand(__parallel)
       for i = 0, nt2 do

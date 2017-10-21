@@ -43,12 +43,21 @@ public:
                 std::map<Memory, std::vector<Processor> >* sysmem_local_procs,
                 std::map<Processor, Memory>* proc_sysmems,
                 std::map<Processor, Memory>* proc_regmems);
+  virtual void select_task_options(const MapperContext    ctx,
+                                   const Task&            task,
+                                         TaskOptions&     output);
   virtual Processor default_policy_select_initial_processor(
                                     MapperContext ctx, const Task &task);
   virtual void default_policy_select_target_processors(
                                     MapperContext ctx,
                                     const Task &task,
                                     std::vector<Processor> &target_procs);
+  virtual LogicalRegion default_policy_select_instance_region(
+                                    MapperContext ctx, Memory target_memory,
+                                    const RegionRequirement &req,
+                                    const LayoutConstraintSet &constraints,
+                                    bool force_new_instances,
+                                    bool meets_constraints);
 private:
   // std::vector<Processor>& procs_list;
   // std::vector<Memory>& sysmems_list;
@@ -71,6 +80,16 @@ CircuitMapper::CircuitMapper(MapperRuntime *rt, Machine machine, Processor local
     proc_sysmems(*_proc_sysmems)// ,
     // proc_regmems(*_proc_regmems)
 {
+}
+
+void CircuitMapper::select_task_options(const MapperContext    ctx,
+                                        const Task&            task,
+                                              TaskOptions&     output)
+{
+  output.initial_proc = default_policy_select_initial_processor(ctx, task);
+  output.inline_task = false;
+  output.stealable = stealing_enabled;
+  output.memoize = task.has_trace();
 }
 
 Processor CircuitMapper::default_policy_select_initial_processor(
@@ -101,6 +120,16 @@ void CircuitMapper::default_policy_select_target_processors(
                                     std::vector<Processor> &target_procs)
 {
   target_procs.push_back(task.target_proc);
+}
+
+LogicalRegion CircuitMapper::default_policy_select_instance_region(
+                                MapperContext ctx, Memory target_memory,
+                                const RegionRequirement &req,
+                                const LayoutConstraintSet &layout_constraints,
+                                bool force_new_instances,
+                                bool meets_constraints)
+{
+  return req.region;
 }
 
 static void create_mappers(Machine machine, HighLevelRuntime *runtime, const std::set<Processor> &local_procs)
