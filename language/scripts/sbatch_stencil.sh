@@ -8,8 +8,8 @@ root_dir="$PWD"
 
 export LD_LIBRARY_PATH="$PWD"
 
-if [[ ! -d spmd10 ]]; then mkdir spmd10; fi
-pushd spmd10
+if [[ ! -d tracing ]]; then mkdir tracing; fi
+pushd tracing
 
 for i in 0 1 2 3; do
     n=$(( 2 ** i))
