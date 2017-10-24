@@ -3148,15 +3148,6 @@ namespace Legion {
                 }
                 break;
               }
-            case Processor::PY_PROC:
-              {
-                if (local_pys.empty())
-                {
-                  ++it;
-                  continue;
-                }
-                break;
-              }
             default:
               assert(false); // unknown processor kind
           }
