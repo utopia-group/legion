@@ -49,6 +49,9 @@ public:
                                     MapperContext ctx,
                                     const Task &task,
                                     std::vector<Processor> &target_procs);
+  virtual Memory default_policy_select_target_memory(MapperContext ctx,
+                                    Processor target_proc,
+                                    const RegionRequirement &req);
   virtual LogicalRegion default_policy_select_instance_region(
                                 MapperContext ctx, Memory target_memory,
                                 const RegionRequirement &req,
@@ -157,6 +160,37 @@ void StencilMapper::default_policy_select_target_processors(
   target_procs.push_back(task.target_proc);
 }
 
+static bool is_ghost(MapperRuntime *runtime,
+                     const MapperContext ctx,
+                     LogicalRegion leaf)
+{
+  // If the region has no parent then it was from a duplicated
+  // partition and therefore must be a ghost.
+  if (!runtime->has_parent_logical_partition(ctx, leaf)) {
+    return true;
+  }
+
+  // Otherwise it is a ghost if the parent region has multiple
+  // partitions.
+  LogicalPartition part = runtime->get_parent_logical_partition(ctx, leaf);
+  LogicalRegion parent = runtime->get_parent_logical_region(ctx, part);
+  std::set<Color> colors;
+  runtime->get_index_space_partition_colors(ctx, parent.get_index_space(), colors);
+  return colors.size() > 1;
+}
+
+Memory StencilMapper::default_policy_select_target_memory(MapperContext ctx,
+                                                   Processor target_proc,
+                                                   const RegionRequirement &req)
+{
+  Memory target_memory = proc_sysmems[target_proc];
+  if (is_ghost(runtime, ctx, req.region)) {
+    std::map<Processor, Memory>::iterator finder = proc_regmems.find(target_proc);
+    if (finder != proc_regmems.end()) target_memory = finder->second;
+  }
+  return target_memory;
+}
+
 LogicalRegion StencilMapper::default_policy_select_instance_region(
                               MapperContext ctx, Memory target_memory,
                               const RegionRequirement &req,
@@ -236,25 +270,6 @@ void StencilMapper::map_copy(const MapperContext ctx,
   }
 }
 
-static bool is_ghost(MapperRuntime *runtime,
-                     const MapperContext ctx,
-                     LogicalRegion leaf)
-{
-  // If the region has no parent then it was from a duplicated
-  // partition and therefore must be a ghost.
-  if (!runtime->has_parent_logical_partition(ctx, leaf))
-    return true;
-
-  // Otherwise it is a ghost if the parent region has multiple
-  // partitions.
-  LogicalPartition part = runtime->get_parent_logical_partition(ctx, leaf);
-  LogicalRegion parent = runtime->get_parent_logical_region(ctx, part);
-  std::set<Color> colors;
-  runtime->get_index_space_partition_colors(ctx, parent.get_index_space(), colors);
-  return colors.size() > 1;
-}
-
-
 void StencilMapper::map_must_epoch(const MapperContext           ctx,
                                    const MapMustEpochInput&      input,
                                          MapMustEpochOutput&     output)
@@ -297,11 +312,7 @@ void StencilMapper::map_must_epoch(const MapperContext           ctx,
     const RegionRequirement& req =
       task->regions[constraint.requirement_indexes[owner_id]];
     Processor task_proc = output.task_processors[task_indices[task]];
-    Memory target_memory = proc_sysmems[task_proc];
-    if (is_ghost(runtime, ctx, req.region)) {
-      std::map<Processor, Memory>::iterator finder = proc_regmems.find(task_proc);
-      if (finder != proc_regmems.end()) target_memory = finder->second;
-    }
+    Memory target_memory = default_policy_select_target_memory(ctx, task_proc, req);
 
     LayoutConstraintSet layout_constraints;
     default_policy_select_constraints(ctx, layout_constraints, target_memory, req);
