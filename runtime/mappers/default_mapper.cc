@@ -1364,12 +1364,13 @@ namespace Legion {
             const TaskLayoutConstraintSet &layout_constraints =
                 runtime->find_task_layout_constraints(ctx,
                                       task.task_id, output.chosen_variant);
-            Memory target_memory = default_policy_select_target_memory(ctx, 
-                                                         task.target_proc);
             for (std::vector<unsigned>::const_iterator it = 
                   reduction_indexes.begin(); it != 
                   reduction_indexes.end(); it++)
             {
+              Memory target_memory = default_policy_select_target_memory(ctx,
+                                                         task.target_proc,
+                                                         task.regions[*it]);
               std::set<FieldID> copy = task.regions[*it].privilege_fields;
               if (!default_create_custom_instances(ctx, task.target_proc,
                   target_memory, task.regions[*it], *it, copy, 
@@ -1394,8 +1395,6 @@ namespace Legion {
       // possibly because a new field was allocated in a region, so our old
       // cached physical instance(s) is(are) no longer valid
       bool needs_field_constraint_check = false;
-      Memory target_memory = default_policy_select_target_memory(ctx, 
-                                                         task.target_proc);
       if (finder != cached_task_mappings.end())
       {
         bool found = false;
@@ -1428,6 +1427,9 @@ namespace Legion {
             {
               if (task.regions[idx].privilege == REDUCE)
               {
+                Memory target_memory = default_policy_select_target_memory(ctx,
+                                                         task.target_proc,
+                                                         task.regions[idx]);
                 std::set<FieldID> copy = task.regions[idx].privilege_fields;
                 if (!default_create_custom_instances(ctx, task.target_proc,
                     target_memory, task.regions[idx], idx, copy, 
@@ -1485,6 +1487,9 @@ namespace Legion {
             missing_fields[idx].empty())
           continue;
         // See if this is a reduction      
+        Memory target_memory = default_policy_select_target_memory(ctx,
+                                                         task.target_proc,
+                                                         task.regions[idx]);
         if (task.regions[idx].privilege == REDUCE)
         {
           has_reductions = true;
@@ -1866,7 +1871,8 @@ namespace Legion {
 
     //--------------------------------------------------------------------------
     Memory DefaultMapper::default_policy_select_target_memory(MapperContext ctx,
-                                                          Processor target_proc)
+                                                   Processor target_proc,
+                                                   const RegionRequirement &req)
     //--------------------------------------------------------------------------
     {
       // TODO: deal with the updates in machine model which will
@@ -2398,7 +2404,8 @@ namespace Legion {
         }
         else
           target_memory = default_policy_select_target_memory(ctx,
-                                  inline_op.parent_task->current_proc);
+                                  inline_op.parent_task->current_proc,
+                                  inline_op.requirement);
         if (creation_constraints.field_constraint.field_set.empty())
           creation_constraints.add_constraint(FieldConstraint(
                 inline_op.requirement.privilege_fields, false/*contig*/));
@@ -2428,7 +2435,8 @@ namespace Legion {
           return;
         // Otherwise, let's make an instance for our missing fields
         target_memory = default_policy_select_target_memory(ctx,
-                                        inline_op.parent_task->current_proc);
+                                        inline_op.parent_task->current_proc,
+                                        inline_op.requirement);
         LayoutConstraintID our_layout_id = 
          default_policy_select_layout_constraints(ctx, target_memory, 
                                                inline_op.requirement, 
@@ -2629,7 +2637,8 @@ namespace Legion {
         // is running.
         Memory target_memory =
           default_policy_select_target_memory(ctx, 
-                                              close.parent_task->current_proc);
+                                              close.parent_task->current_proc,
+                                              close.requirement);
         LayoutConstraintSet constraints;
         default_policy_select_constraints(ctx, constraints, target_memory,
                                           close.requirement);
@@ -3040,8 +3049,9 @@ namespace Legion {
       //  ask for layout choices
       unsigned home_task_idx = accessing_task_idxs[0];
       Processor target_proc = target_procs[home_task_idx];
-      Memory target_memory = default_policy_select_target_memory(ctx, 
-								 target_proc);
+      Memory target_memory = default_policy_select_target_memory(ctx,
+                      target_proc,
+                      tasks[home_task_idx]->regions[req_indexes[home_task_idx]]);
       // if we have more than one task, double-check that this memory is kosher 
       // with the other ones too
       if(accessing_task_idxs.size() > 1) {
