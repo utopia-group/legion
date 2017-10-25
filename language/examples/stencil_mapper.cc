@@ -176,7 +176,7 @@ static bool is_ghost(MapperRuntime *runtime,
   LogicalRegion parent = runtime->get_parent_logical_region(ctx, part);
   std::set<Color> colors;
   runtime->get_index_space_partition_colors(ctx, parent.get_index_space(), colors);
-  return colors.size() > 1;
+  return colors.size() == 2; // > 1; // FIXME: the private region has three partitions
 }
 
 Memory StencilMapper::default_policy_select_target_memory(MapperContext ctx,
