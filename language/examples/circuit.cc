@@ -52,8 +52,6 @@ public:
   virtual void default_policy_rank_processor_kinds(
                                     MapperContext ctx, const Task &task,
                                     std::vector<Processor::Kind> &ranking);
-  virtual Processor default_policy_select_initial_processor(
-                                    MapperContext ctx, const Task &task);
   virtual void default_policy_select_target_processors(
                                     MapperContext ctx,
                                     const Task &task,
@@ -135,20 +133,10 @@ void CircuitMapper::default_policy_rank_processor_kinds(MapperContext ctx,
     ranking[3] = Processor::LOC_PROC;
   } else {
 #endif
-    ranking.resize(4);
-    ranking[0] = Processor::TOC_PROC;
-    ranking[1] = Processor::PROC_SET;
-    ranking[2] = Processor::LOC_PROC;
-    ranking[3] = Processor::IO_PROC;
+    DefaultMapper::default_policy_rank_processor_kinds(ctx, task, ranking);
 #if SPMD_SHARD_USE_IO_PROC
   }
 #endif
-}
-
-Processor CircuitMapper::default_policy_select_initial_processor(
-                                    MapperContext ctx, const Task &task)
-{
-  return DefaultMapper::default_policy_select_initial_processor(ctx, task);
 }
 
 void CircuitMapper::default_policy_select_target_processors(
