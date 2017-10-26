@@ -1075,11 +1075,7 @@ void PennantMapper::default_policy_rank_processor_kinds(MapperContext ctx,
     ranking[3] = Processor::LOC_PROC;
   } else {
 #endif
-    ranking.resize(4);
-    ranking[0] = Processor::TOC_PROC;
-    ranking[1] = Processor::PROC_SET;
-    ranking[2] = Processor::LOC_PROC;
-    ranking[3] = Processor::IO_PROC;
+    DefaultMapper::default_policy_rank_processor_kinds(ctx, task, ranking);
 #if SPMD_SHARD_USE_IO_PROC
   }
 #endif
