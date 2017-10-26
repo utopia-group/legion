@@ -239,7 +239,6 @@ void StencilMapper::map_task(const MapperContext      ctx,
   DefaultMapper::map_task(ctx, task, input, output);
 }
 
-
 void StencilMapper::map_copy(const MapperContext ctx,
                              const Copy &copy,
                              const MapCopyInput &input,
