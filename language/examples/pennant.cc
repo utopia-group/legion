@@ -1184,7 +1184,6 @@ void PennantMapper::map_task(const MapperContext      ctx,
       if ((req.privilege == NO_ACCESS) || (req.privilege_fields.empty()))
         continue;
 
-      // Create instances for reduction
       if (input.valid_instances[idx].size() == 0) {
         // FIXME: Would be nice to make this more efficient
         const TaskLayoutConstraintSet &layout_constraints =
