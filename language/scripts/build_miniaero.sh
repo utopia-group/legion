@@ -9,7 +9,7 @@ cd "$1"
 
 for c in 8; do
     SAVEOBJ=1 $root_dir/../regent.py $root_dir/../miniaero/rdir_1ghost.rg -fflow 1 -fflow-spmd 1 -fflow-spmd-shardsize "$c" -fopenmp 0
-    mv $root_dir/../miniaero/miniaero_rdir_1ghost miniaero.spmd"$c"
+    mv miniaero_rdir_1ghost miniaero.spmd"$c"
 done
 
 cp $root_dir/../../bindings/terra/liblegion_terra.so .
