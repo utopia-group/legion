@@ -1164,7 +1164,7 @@ void PennantMapper::map_task(const MapperContext      ctx,
                              const MapTaskInput&      input,
                                    MapTaskOutput&     output)
 {
-#if 0
+#if 1
   if (task.parent_task != NULL && task.parent_task->must_epoch_task) {
     Processor::Kind target_kind = task.target_proc.kind();
     // Get the variant that we are going to use to map this task
@@ -1184,7 +1184,27 @@ void PennantMapper::map_task(const MapperContext      ctx,
       if ((req.privilege == NO_ACCESS) || (req.privilege_fields.empty()))
         continue;
 
-      assert(input.valid_instances[idx].size() == 1);
+      // Create instances for reduction
+      if (input.valid_instances[idx].size() == 0) {
+        // FIXME: Would be nice to make this more efficient
+        const TaskLayoutConstraintSet &layout_constraints =
+          runtime->find_task_layout_constraints(ctx,
+                                  task.task_id, output.chosen_variant);
+        Memory target_memory = default_policy_select_target_memory(ctx,
+                                                 task.target_proc, req);
+        std::set<FieldID> copy = req.privilege_fields;
+        if (!default_create_custom_instances(ctx, task.target_proc,
+            target_memory, req, idx, copy, 
+            layout_constraints, false, 
+            output.chosen_instances[idx]))
+        {
+          default_report_failed_instance_creation(task, idx, 
+                                      task.target_proc, target_memory);
+        }
+        continue;
+      }
+
+      assert(input.valid_instances[idx].size() > 0);
       output.chosen_instances[idx] = input.valid_instances[idx];
       bool ok = runtime->acquire_and_filter_instances(ctx, output.chosen_instances);
       if (!ok) {

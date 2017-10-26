@@ -193,7 +193,7 @@ void CircuitMapper::map_task(const MapperContext      ctx,
                              const MapTaskInput&      input,
                                    MapTaskOutput&     output)
 {
-#if 0
+#if 1
   if (task.parent_task != NULL && task.parent_task->must_epoch_task) {
     Processor::Kind target_kind = task.target_proc.kind();
     // Get the variant that we are going to use to map this task
@@ -214,7 +214,7 @@ void CircuitMapper::map_task(const MapperContext      ctx,
         continue;
 
       // Create instances for reduction
-      if (req.privilege == REDUCE) {
+      if (input.valid_instances[idx].size() == 0) {
         // FIXME: Would be nice to make this more efficient
         const TaskLayoutConstraintSet &layout_constraints =
           runtime->find_task_layout_constraints(ctx,
@@ -233,7 +233,7 @@ void CircuitMapper::map_task(const MapperContext      ctx,
         continue;
       }
 
-      assert(input.valid_instances[idx].size() == 1);
+      assert(input.valid_instances[idx].size() > 0);
       output.chosen_instances[idx] = input.valid_instances[idx];
       bool ok = runtime->acquire_and_filter_instances(ctx, output.chosen_instances);
       if (!ok) {
