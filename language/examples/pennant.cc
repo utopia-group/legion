@@ -967,7 +967,7 @@ void generate_mesh_raw(
 /// Mapper
 ///
 
-#define SPMD_SHARD_USE_IO_PROC 0
+#define SPMD_SHARD_USE_IO_PROC 1
 
 static LegionRuntime::Logger::Category log_pennant("pennant");
 
@@ -996,12 +996,19 @@ public:
                                     MapperContext ctx,
                                     const Task &task,
                                     std::vector<Processor> &target_procs);
+  virtual Memory default_policy_select_target_memory(MapperContext ctx,
+                                    Processor target_proc,
+                                    const RegionRequirement &req);
   virtual LogicalRegion default_policy_select_instance_region(
                                     MapperContext ctx, Memory target_memory,
                                     const RegionRequirement &req,
                                     const LayoutConstraintSet &constraints,
                                     bool force_new_instances,
                                     bool meets_constraints);
+  virtual void map_task(const MapperContext ctx,
+                        const Task &task,
+                        const MapTaskInput &input,
+                        MapTaskOutput &output);
   virtual void map_copy(const MapperContext ctx,
                         const Copy &copy,
                         const MapCopyInput &input,
@@ -1021,7 +1028,7 @@ private:
   std::map<Memory, std::vector<Processor> >& sysmem_local_io_procs;
 #endif
   std::map<Processor, Memory>& proc_sysmems;
-  // std::map<Processor, Memory>& proc_regmems;
+  std::map<Processor, Memory>& proc_regmems;
 };
 
 PennantMapper::PennantMapper(MapperRuntime *rt, Machine machine, Processor local,
@@ -1041,8 +1048,8 @@ PennantMapper::PennantMapper(MapperRuntime *rt, Machine machine, Processor local
 #if SPMD_SHARD_USE_IO_PROC
     sysmem_local_io_procs(*_sysmem_local_io_procs),
 #endif
-    proc_sysmems(*_proc_sysmems)// ,
-    // proc_regmems(*_proc_regmems)
+    proc_sysmems(*_proc_sysmems),
+    proc_regmems(*_proc_regmems)
 {
 }
 
@@ -1118,6 +1125,37 @@ void PennantMapper::default_policy_select_target_processors(
   target_procs.push_back(task.target_proc);
 }
 
+static bool is_ghost(MapperRuntime *runtime,
+                     const MapperContext ctx,
+                     LogicalRegion leaf)
+{
+  // If the region has no parent then it was from a duplicated
+  // partition and therefore must be a ghost.
+  if (!runtime->has_parent_logical_partition(ctx, leaf)) {
+    return true;
+  }
+
+  // Otherwise it is a ghost if the parent region has multiple
+  // partitions.
+  LogicalPartition part = runtime->get_parent_logical_partition(ctx, leaf);
+  LogicalRegion parent = runtime->get_parent_logical_region(ctx, part);
+  std::set<Color> colors;
+  runtime->get_index_space_partition_colors(ctx, parent.get_index_space(), colors);
+  return colors.size() > 1;
+}
+
+Memory PennantMapper::default_policy_select_target_memory(MapperContext ctx,
+                                                   Processor target_proc,
+                                                   const RegionRequirement &req)
+{
+  Memory target_memory = proc_sysmems[target_proc];
+  if (is_ghost(runtime, ctx, req.region)) {
+    std::map<Processor, Memory>::iterator finder = proc_regmems.find(target_proc);
+    if (finder != proc_regmems.end()) target_memory = finder->second;
+  }
+  return target_memory;
+}
+
 LogicalRegion PennantMapper::default_policy_select_instance_region(
                                 MapperContext ctx, Memory target_memory,
                                 const RegionRequirement &req,
@@ -1128,81 +1166,42 @@ LogicalRegion PennantMapper::default_policy_select_instance_region(
   return req.region;
 }
 
-//--------------------------------------------------------------------------
-template<bool IS_SRC>
-void PennantMapper::pennant_create_copy_instance(MapperContext ctx,
-                     const Copy &copy, const RegionRequirement &req,
-                     unsigned idx, std::vector<PhysicalInstance> &instances)
-//--------------------------------------------------------------------------
+void PennantMapper::map_task(const MapperContext      ctx,
+                             const Task&              task,
+                             const MapTaskInput&      input,
+                                   MapTaskOutput&     output)
 {
-  // This method is identical to the default version except that it
-  // chooses an intelligent memory based on the destination of the
-  // copy.
+  if (task.parent_task != NULL && task.parent_task->must_epoch_task) {
+    Processor::Kind target_kind = task.target_proc.kind();
+    // Get the variant that we are going to use to map this task
+    VariantInfo chosen = default_find_preferred_variant(task, ctx,
+                                                        true/*needs tight bound*/, true/*cache*/, target_kind);
+    output.chosen_variant = chosen.variant;
+    // TODO: some criticality analysis to assign priorities
+    output.task_priority = 0;
+    output.postmap_task = false;
+    // Figure out our target processors
+    output.target_procs.push_back(task.target_proc);
 
-  // See if we have all the fields covered
-  std::set<FieldID> missing_fields = req.privilege_fields;
-  for (std::vector<PhysicalInstance>::const_iterator it =
-        instances.begin(); it != instances.end(); it++)
-  {
-    it->remove_space_fields(missing_fields);
-    if (missing_fields.empty())
-      break;
-  }
-  if (missing_fields.empty())
+    for (unsigned idx = 0; idx < task.regions.size(); idx++) {
+      const RegionRequirement &req = task.regions[idx];
+
+      // Skip any empty regions
+      if ((req.privilege == NO_ACCESS) || (req.privilege_fields.empty()))
+        continue;
+
+      assert(input.valid_instances[idx].size() == 1);
+      output.chosen_instances[idx] = input.valid_instances[idx];
+      bool ok = runtime->acquire_and_filter_instances(ctx, output.chosen_instances);
+      if (!ok) {
+        log_pennant.error("failed to acquire instances");
+        assert(false);
+      }
+    }
     return;
-  // If we still have fields, we need to make an instance
-  // We clearly need to take a guess, let's see if we can find
-  // one of our instances to use.
-
-  // ELLIOTT: Get the remote node here.
-  Color index = runtime->get_logical_region_color(ctx, copy.src_requirements[idx].region);
-// #if SPMD_RESERVE_SHARD_PROC
-//   size_t sysmem_index = index / (std::max(sysmem_local_procs.begin()->second.size() - 1, (size_t)1));
-// #else
-//   size_t sysmem_index = index / sysmem_local_procs.begin()->second.size();
-// #endif
-//   assert(sysmem_index < sysmems_list.size());
-//   Memory target_memory = sysmems_list[sysmem_index];
-  Memory target_memory = default_policy_select_target_memory(ctx,
-                           procs_list[index % procs_list.size()],
-                           req);
-  log_pennant.spew("Building instance for copy of a region with index %u to be in memory %llx",
-                      index, target_memory.id);
-  bool force_new_instances = false;
-  LayoutConstraintID our_layout_id =
-   default_policy_select_layout_constraints(ctx, target_memory,
-                                            req, COPY_MAPPING,
-                                            true/*needs check*/,
-                                            force_new_instances);
-  LayoutConstraintSet creation_constraints =
-              runtime->find_layout_constraints(ctx, our_layout_id);
-  creation_constraints.add_constraint(
-      FieldConstraint(missing_fields,
-                      false/*contig*/, false/*inorder*/));
-  instances.resize(instances.size() + 1);
-  if (!default_make_instance(ctx, target_memory,
-        creation_constraints, instances.back(),
-        COPY_MAPPING, force_new_instances, true/*meets*/, req))
-  {
-    // If we failed to make it that is bad
-    log_pennant.error("Pennant mapper failed allocation for "
-                   "%s region requirement %d of explicit "
-                   "region-to-region copy operation in task %s "
-                   "(ID %lld) in memory " IDFMT " for processor "
-                   IDFMT ". This means the working set of your "
-                   "application is too big for the allotted "
-                   "capacity of the given memory under the default "
-                   "mapper's mapping scheme. You have three "
-                   "choices: ask Realm to allocate more memory, "
-                   "write a custom mapper to better manage working "
-                   "sets, or find a bigger machine. Good luck!",
-                   IS_SRC ? "source" : "destination", idx,
-                   copy.parent_task->get_task_name(),
-                   copy.parent_task->get_unique_id(),
-		       target_memory.id,
-		       copy.parent_task->current_proc.id);
-    assert(false);
   }
+
+  DefaultMapper::map_task(ctx, task, input, output);
 }
 
 void PennantMapper::map_copy(const MapperContext ctx,
@@ -1290,7 +1289,8 @@ void PennantMapper::map_must_epoch(const MapperContext           ctx,
     const Task* task = constraint.constrained_tasks[owner_id];
     const RegionRequirement& req =
       task->regions[constraint.requirement_indexes[owner_id]];
-    Memory target_memory = sysmems_list[task_indices[task]];
+    Processor task_proc = output.task_processors[task_indices[task]];
+    Memory target_memory = default_policy_select_target_memory(ctx, task_proc, req);
     LayoutConstraintSet layout_constraints;
     default_policy_select_constraints(ctx, layout_constraints, target_memory, req);
     layout_constraints.add_constraint(
@@ -1303,6 +1303,81 @@ void PennantMapper::map_must_epoch(const MapperContext           ctx,
         inst, created, true /*acquire*/);
     assert(ok);
     output.constraint_mappings[idx].push_back(inst);
+  }
+}
+
+template<bool IS_SRC>
+void PennantMapper::pennant_create_copy_instance(MapperContext ctx,
+                     const Copy &copy, const RegionRequirement &req,
+                     unsigned idx, std::vector<PhysicalInstance> &instances)
+{
+  // This method is identical to the default version except that it
+  // chooses an intelligent memory based on the destination of the
+  // copy.
+
+  // See if we have all the fields covered
+  std::set<FieldID> missing_fields = req.privilege_fields;
+  for (std::vector<PhysicalInstance>::const_iterator it =
+        instances.begin(); it != instances.end(); it++)
+  {
+    it->remove_space_fields(missing_fields);
+    if (missing_fields.empty())
+      break;
+  }
+  if (missing_fields.empty())
+    return;
+  // If we still have fields, we need to make an instance
+  // We clearly need to take a guess, let's see if we can find
+  // one of our instances to use.
+
+  // ELLIOTT: Get the remote node here.
+  Color index = runtime->get_logical_region_color(ctx, copy.src_requirements[idx].region);
+// #if SPMD_RESERVE_SHARD_PROC
+//   size_t sysmem_index = index / (std::max(sysmem_local_procs.begin()->second.size() - 1, (size_t)1));
+// #else
+//   size_t sysmem_index = index / sysmem_local_procs.begin()->second.size();
+// #endif
+//   assert(sysmem_index < sysmems_list.size());
+//   Memory target_memory = sysmems_list[sysmem_index];
+  Memory target_memory = default_policy_select_target_memory(ctx,
+                           procs_list[index % procs_list.size()],
+                           req);
+  log_pennant.spew("Building instance for copy of a region with index %u to be in memory %llx",
+                      index, target_memory.id);
+  bool force_new_instances = false;
+  LayoutConstraintID our_layout_id =
+   default_policy_select_layout_constraints(ctx, target_memory,
+                                            req, COPY_MAPPING,
+                                            true/*needs check*/,
+                                            force_new_instances);
+  LayoutConstraintSet creation_constraints =
+              runtime->find_layout_constraints(ctx, our_layout_id);
+  creation_constraints.add_constraint(
+      FieldConstraint(missing_fields,
+                      false/*contig*/, false/*inorder*/));
+  instances.resize(instances.size() + 1);
+  if (!default_make_instance(ctx, target_memory,
+        creation_constraints, instances.back(),
+        COPY_MAPPING, force_new_instances, true/*meets*/, req))
+  {
+    // If we failed to make it that is bad
+    log_pennant.error("Pennant mapper failed allocation for "
+                   "%s region requirement %d of explicit "
+                   "region-to-region copy operation in task %s "
+                   "(ID %lld) in memory " IDFMT " for processor "
+                   IDFMT ". This means the working set of your "
+                   "application is too big for the allotted "
+                   "capacity of the given memory under the default "
+                   "mapper's mapping scheme. You have three "
+                   "choices: ask Realm to allocate more memory, "
+                   "write a custom mapper to better manage working "
+                   "sets, or find a bigger machine. Good luck!",
+                   IS_SRC ? "source" : "destination", idx,
+                   copy.parent_task->get_task_name(),
+                   copy.parent_task->get_unique_id(),
+		       target_memory.id,
+		       copy.parent_task->current_proc.id);
+    assert(false);
   }
 }
 
