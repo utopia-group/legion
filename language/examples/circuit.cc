@@ -75,9 +75,6 @@ public:
                         const Copy &copy,
                         const MapCopyInput &input,
                         MapCopyOutput &output);
-  virtual void map_must_epoch(const MapperContext           ctx,
-                              const MapMustEpochInput&      input,
-                                    MapMustEpochOutput&     output);
   template<bool IS_SRC>
   void circuit_create_copy_instance(MapperContext ctx, const Copy &copy,
                                     const RegionRequirement &req, unsigned index,
@@ -208,6 +205,7 @@ void CircuitMapper::map_task(const MapperContext      ctx,
                              const MapTaskInput&      input,
                                    MapTaskOutput&     output)
 {
+#if 0
   if (task.parent_task != NULL && task.parent_task->must_epoch_task) {
     Processor::Kind target_kind = task.target_proc.kind();
     // Get the variant that we are going to use to map this task
@@ -257,6 +255,7 @@ void CircuitMapper::map_task(const MapperContext      ctx,
     }
     return;
   }
+#endif
 
   DefaultMapper::map_task(ctx, task, input, output);
 }
@@ -303,63 +302,6 @@ void CircuitMapper::map_copy(const MapperContext ctx,
         runtime->acquire_and_filter_instances(ctx,
                                 output.dst_instances[idx]);
     }
-  }
-}
-void CircuitMapper::map_must_epoch(const MapperContext           ctx,
-                                   const MapMustEpochInput&      input,
-                                         MapMustEpochOutput&     output)
-{
-  size_t num_nodes = sysmems_list.size();
-  size_t num_tasks = input.tasks.size();
-  size_t num_shards_per_node =
-    num_nodes < input.tasks.size() ? (num_tasks + num_nodes - 1) / num_nodes : 1;
-  std::map<const Task*, size_t> task_indices;
-  for (size_t idx = 0; idx < num_tasks; ++idx) {
-    size_t node_idx = idx / num_shards_per_node;
-    size_t proc_idx = idx % num_shards_per_node;
-    assert(node_idx < sysmems_list.size());
-#if SPMD_SHARD_USE_IO_PROC
-    assert(proc_idx < sysmem_local_io_procs[sysmems_list[node_idx]].size());
-    output.task_processors[idx] = sysmem_local_io_procs[sysmems_list[node_idx]][proc_idx];
-#else
-    assert(proc_idx < sysmem_local_procs[sysmems_list[node_idx]].size());
-    output.task_processors[idx] = sysmem_local_procs[sysmems_list[node_idx]][proc_idx];
-#endif
-
-    task_indices[input.tasks[idx]] = node_idx;
-  }
-
-  for (size_t idx = 0; idx < input.constraints.size(); ++idx) {
-    const MappingConstraint& constraint = input.constraints[idx];
-    int owner_id = -1;
-
-    for (unsigned i = 0; i < constraint.constrained_tasks.size(); ++i) {
-      const RegionRequirement& req =
-        constraint.constrained_tasks[i]->regions[
-          constraint.requirement_indexes[i]];
-      if (req.is_no_access()) continue;
-      assert(owner_id == -1);
-      owner_id = static_cast<int>(i);
-    }
-    assert(owner_id != -1);
-
-    const Task* task = constraint.constrained_tasks[owner_id];
-    const RegionRequirement& req =
-      task->regions[constraint.requirement_indexes[owner_id]];
-    Processor task_proc = output.task_processors[task_indices[task]];
-    Memory target_memory = default_policy_select_target_memory(ctx, task_proc, req);
-    LayoutConstraintSet layout_constraints;
-    default_policy_select_constraints(ctx, layout_constraints, target_memory, req);
-    layout_constraints.add_constraint(
-      FieldConstraint(req.privilege_fields, false /*!contiguous*/));
-
-    PhysicalInstance inst;
-    bool created;
-    bool ok = runtime->find_or_create_physical_instance(ctx, target_memory,
-        layout_constraints, std::vector<LogicalRegion>(1, req.region),
-        inst, created, true /*acquire*/);
-    assert(ok);
-    output.constraint_mappings[idx].push_back(inst);
   }
 }
 
