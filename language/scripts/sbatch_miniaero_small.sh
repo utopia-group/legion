@@ -1,5 +1,5 @@
 #!/bin/sh
-#SBATCH --nodes=64
+#SBATCH --nodes=8
 #SBATCH --constraint=gpu
 #SBATCH --time=00:30:00
 #SBATCH --mail-type=ALL
@@ -11,7 +11,7 @@ export LD_LIBRARY_PATH="$PWD"
 if [[ ! -d tracing ]]; then mkdir tracing; fi
 pushd tracing
 
-for n in 64 32 16; do
+for n in 8 4 2 1; do
     for r in 0 1 2 3 4; do
         if [[ ! -f out_"$n"x8_r"$r".log ]]; then
             echo "Running $n""x8_r$r""..."
