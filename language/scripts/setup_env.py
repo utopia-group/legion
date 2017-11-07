@@ -216,7 +216,7 @@ def driver(llvm_version, skip_certificate_check):
 
     terra_dir = os.path.join(root_dir, 'terra.build')
     if not os.path.exists(terra_dir):
-        git_clone(terra_dir, 'https://github.com/elliottslaughter/terra.git', 'compiler-sc17-snapshot')
+        git_clone(terra_dir, 'https://github.com/magnatelee/terra.git', 'luajit2.1')
         build_terra(terra_dir, llvm_install_dir, is_cray, thread_count)
 
     use_cuda = 'USE_CUDA' in os.environ and os.environ['USE_CUDA'] == '1'
