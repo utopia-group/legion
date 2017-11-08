@@ -77,6 +77,7 @@ private:
 #endif
   std::map<Processor, Memory>& proc_sysmems;
   std::map<Processor, Memory>& proc_regmems;
+  std::map<std::pair<TaskID, LogicalRegion>, Processor> init_procs;
 };
 
 StencilMapper::StencilMapper(MapperRuntime *rt, Machine machine, Processor local,
@@ -105,7 +106,19 @@ void StencilMapper::select_task_options(const MapperContext    ctx,
                                         const Task&            task,
                                               TaskOptions&     output)
 {
-  output.initial_proc = default_policy_select_initial_processor(ctx, task);
+  std::pair<TaskID, LogicalRegion> key(task.task_id,
+      task.regions.size() > 0 ? task.regions[0].region
+                              : LogicalRegion::NO_REGION);
+
+  std::map<std::pair<TaskID, LogicalRegion>, Processor>::iterator
+    finder = init_procs.find(key);
+  if (finder == init_procs.end())
+  {
+    output.initial_proc = default_policy_select_initial_processor(ctx, task);
+    init_procs[key] = output.initial_proc;
+  }
+  else
+    output.initial_proc = finder->second;
   output.inline_task = false;
   output.stealable = stealing_enabled;
 #ifdef MAP_LOCALLY
