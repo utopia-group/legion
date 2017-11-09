@@ -52,6 +52,8 @@ public:
   virtual void default_policy_rank_processor_kinds(
                                     MapperContext ctx, const Task &task,
                                     std::vector<Processor::Kind> &ranking);
+  virtual Processor default_policy_select_initial_processor(
+                                    MapperContext ctx, const Task &task);
   virtual void default_policy_select_target_processors(
                                     MapperContext ctx,
                                     const Task &task,
@@ -150,6 +152,35 @@ void CircuitMapper::default_policy_rank_processor_kinds(MapperContext ctx,
 #if SPMD_SHARD_USE_IO_PROC
   }
 #endif
+}
+
+Processor CircuitMapper::default_policy_select_initial_processor(
+                                    MapperContext ctx, const Task &task)
+{
+  if (!task.regions.empty()) {
+    if (task.regions[0].handle_type == SINGULAR) {
+      Color index = runtime->get_logical_region_color(ctx, task.regions[0].region);
+#define NO_SPMD 0
+#if NO_SPMD
+      return procs_list[index % procs_list.size()];
+#else
+      std::vector<Processor> &local_procs =
+        sysmem_local_procs[proc_sysmems[local_proc]];
+      if (local_procs.size() > 1) {
+#define SPMD_RESERVE_SHARD_PROC 0
+#if SPMD_RESERVE_SHARD_PROC
+        return local_procs[(index % (local_procs.size() - 1)) + 1];
+#else
+        return local_procs[index % local_procs.size()];
+#endif
+      } else {
+        return local_procs[0];
+      }
+#endif
+    }
+  }
+
+  return DefaultMapper::default_policy_select_initial_processor(ctx, task);
 }
 
 void CircuitMapper::default_policy_select_target_processors(
