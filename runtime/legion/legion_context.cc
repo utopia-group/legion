@@ -38,7 +38,7 @@ namespace Legion {
         children_complete_invoked(false), children_commit_invoked(false)
     //--------------------------------------------------------------------------
     {
-      context_lock = Reservation::create_reservation();
+      privilege_lock = Reservation::create_reservation();
     }
 
     //--------------------------------------------------------------------------
@@ -54,8 +54,8 @@ namespace Legion {
     TaskContext::~TaskContext(void)
     //--------------------------------------------------------------------------
     {
-      context_lock.destroy_reservation();
-      context_lock = Reservation::NO_RESERVATION;
+      privilege_lock.destroy_reservation();
+      privilege_lock = Reservation::NO_RESERVATION;
       // Clean up any local variables that we have
       if (!task_local_variables.empty())
       {
@@ -271,7 +271,7 @@ namespace Legion {
       // Create a new logical region 
       // Hold the operation lock when doing this since children could
       // be returning values from the utility processor
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
 #ifdef DEBUG_LEGION
       assert(created_regions.find(handle) == created_regions.end());
 #endif
@@ -287,7 +287,7 @@ namespace Legion {
       // Hold the operation lock when doing this since children could
       // be returning values from the utility processor
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         std::set<LogicalRegion>::iterator finder = created_regions.find(handle);
         // See if we created this region, if so remove it from the list
         // of created regions, otherwise add it to the list of deleted
@@ -309,7 +309,7 @@ namespace Legion {
                                               FieldID fid, bool local)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       std::pair<FieldSpace,FieldID> key(handle,fid);
 #ifdef DEBUG_LEGION
       assert(created_fields.find(key) == created_fields.end());
@@ -322,7 +322,7 @@ namespace Legion {
                                           const std::vector<FieldID> &fields)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       for (unsigned idx = 0; idx < fields.size(); idx++)
       {
         std::pair<FieldSpace,FieldID> key(handle,fields[idx]);
@@ -340,7 +340,7 @@ namespace Legion {
     {
       std::set<FieldID> to_finalize;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         for (std::set<FieldID>::const_iterator it = to_free.begin();
               it != to_free.end(); it++)
         {
@@ -364,7 +364,7 @@ namespace Legion {
     void TaskContext::register_field_space_creation(FieldSpace space)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
 #ifdef DEBUG_LEGION
       assert(created_field_spaces.find(space) == created_field_spaces.end());
 #endif
@@ -377,7 +377,7 @@ namespace Legion {
     {
       bool finalize = false;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         std::deque<FieldID> to_delete;
         for (std::map<std::pair<FieldSpace,FieldID>,bool>::const_iterator it =
               created_fields.begin(); it != created_fields.end(); it++)
@@ -408,7 +408,7 @@ namespace Legion {
     bool TaskContext::has_created_index_space(IndexSpace space) const
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       return (created_index_spaces.find(space) != created_index_spaces.end());
     }
 
@@ -416,7 +416,7 @@ namespace Legion {
     void TaskContext::register_index_space_creation(IndexSpace space)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
 #ifdef DEBUG_LEGION
       assert(created_index_spaces.find(space) == created_index_spaces.end());
 #endif
@@ -429,7 +429,7 @@ namespace Legion {
     {
       bool finalize = false;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         std::set<IndexSpace>::iterator finder = 
           created_index_spaces.find(space);
         if (finder != created_index_spaces.end())
@@ -448,7 +448,7 @@ namespace Legion {
     void TaskContext::register_index_partition_creation(IndexPartition handle)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
 #ifdef DEBUG_LEGION
       assert(created_index_partitions.find(handle) == 
              created_index_partitions.end());
@@ -462,7 +462,7 @@ namespace Legion {
     {
       bool finalize = false;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         std::set<IndexPartition>::iterator finder = 
           created_index_partitions.find(handle);
         if (finder != created_index_partitions.end())
@@ -494,7 +494,7 @@ namespace Legion {
                                             const std::set<LogicalRegion> &regs)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       for (std::set<LogicalRegion>::const_iterator it = regs.begin();
             it != regs.end(); it++)
       {
@@ -513,7 +513,7 @@ namespace Legion {
     {
       std::vector<LogicalRegion> to_finalize;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         for (std::set<LogicalRegion>::const_iterator it = regs.begin();
               it != regs.end(); it++)
         {
@@ -540,7 +540,7 @@ namespace Legion {
                      const std::map<std::pair<FieldSpace,FieldID>,bool> &fields)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       for (std::map<std::pair<FieldSpace,FieldID>,bool>::const_iterator it = 
             fields.begin(); it != fields.end(); it++)
       {
@@ -558,7 +558,7 @@ namespace Legion {
     {
       std::map<FieldSpace,std::set<FieldID> > to_finalize;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         for (std::set<std::pair<FieldSpace,FieldID> >::const_iterator it = 
               fields.begin(); it != fields.end(); it++)
         {
@@ -588,7 +588,7 @@ namespace Legion {
                                             const std::set<FieldSpace> &spaces)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       for (std::set<FieldSpace>::const_iterator it = spaces.begin();
             it != spaces.end(); it++)
       {
@@ -606,7 +606,7 @@ namespace Legion {
     {
       std::vector<FieldSpace> to_finalize;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         for (std::set<FieldSpace>::const_iterator it = spaces.begin();
               it != spaces.end(); it++)
         {
@@ -645,7 +645,7 @@ namespace Legion {
                                             const std::set<IndexSpace> &spaces)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       for (std::set<IndexSpace>::const_iterator it = spaces.begin();
             it != spaces.end(); it++)
       {
@@ -663,7 +663,7 @@ namespace Legion {
     {
       std::vector<IndexSpace> to_finalize;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         for (std::set<IndexSpace>::const_iterator it = spaces.begin();
               it != spaces.end(); it++)
         {
@@ -691,7 +691,7 @@ namespace Legion {
                                           const std::set<IndexPartition> &parts)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       for (std::set<IndexPartition>::const_iterator it = parts.begin();
             it != parts.end(); it++)
       {
@@ -710,7 +710,7 @@ namespace Legion {
     {
       std::vector<IndexPartition> to_finalize;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock priv_lock(privilege_lock);
         for (std::set<IndexPartition>::const_iterator it = parts.begin();
               it != parts.end(); it++)
         {
@@ -775,7 +775,7 @@ namespace Legion {
       std::deque<RegionRequirement> local_requirements;
       std::deque<unsigned> parent_indexes;
       {
-        AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+        AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
         for (std::deque<RegionRequirement>::const_iterator it = 
               created_requirements.begin(); it != 
               created_requirements.end(); it++, parent_index++)
@@ -862,7 +862,7 @@ namespace Legion {
       std::deque<RegionRequirement> local_requirements;
       std::deque<unsigned> parent_indexes;
       {
-        AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+        AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
         for (std::deque<RegionRequirement>::const_iterator it = 
               created_requirements.begin(); it != 
               created_requirements.end(); it++, parent_index++)
@@ -934,7 +934,7 @@ namespace Legion {
         parent_req_indexes.push_back(parent_index);
       }
       unsigned created_index = 0;
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
       for (std::deque<RegionRequirement>::const_iterator it = 
             created_requirements.begin(); it != 
             created_requirements.end(); it++, parent_index++, created_index++)
@@ -988,7 +988,7 @@ namespace Legion {
         req.handle_type = SINGULAR;
         parent_req_indexes.push_back(parent_index);
       }
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
       for (std::deque<RegionRequirement>::const_iterator it = 
             created_requirements.begin(); it != 
             created_requirements.end(); it++, parent_index++)
@@ -1055,7 +1055,7 @@ namespace Legion {
       std::deque<RegionRequirement> local_requirements;
       std::deque<unsigned> parent_indexes;
       {
-        AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+        AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
         for (std::deque<RegionRequirement>::const_iterator it = 
               created_requirements.begin(); it != 
               created_requirements.end(); it++, parent_index++)
@@ -1140,7 +1140,7 @@ namespace Legion {
       std::deque<RegionRequirement> local_requirements;
       std::deque<unsigned> parent_indexes;
       {
-        AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+        AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
         for (std::deque<RegionRequirement>::const_iterator it = 
               created_requirements.begin(); it != 
               created_requirements.end(); it++, parent_index++)
@@ -1589,7 +1589,6 @@ namespace Legion {
     bool TaskContext::is_region_mapped(unsigned idx)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
 #ifdef DEBUG_LEGION
       assert(idx < physical_regions.size());
 #endif
@@ -1603,7 +1602,7 @@ namespace Legion {
       if (idx >= regions.size())
       {
         idx -= regions.size();
-        AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+        AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
 #ifdef DEBUG_LEGION
         assert(idx < created_requirements.size());
 #endif
@@ -1651,7 +1650,7 @@ namespace Legion {
       // The created region requirements have to be checked while holding
       // the lock since they are subject to mutation by the application
       // We might also mutate it so we take the lock in exclusive mode
-      AutoLock ctx_lock(context_lock);
+      AutoLock priv_lock(privilege_lock);
       for (unsigned idx = 0; idx < created_requirements.size(); idx++)
       {
         RegionRequirement &our_req = created_requirements[idx];
@@ -1741,7 +1740,7 @@ namespace Legion {
         if (regions[idx].region == child->regions[index].parent)
           return idx;
       }
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
       for (unsigned idx = 0; idx < created_requirements.size(); idx++)
       {
         if (created_requirements[idx].region == child->regions[index].parent)
@@ -1794,7 +1793,7 @@ namespace Legion {
       if (idx < regions.size())
         return regions[idx].privilege;
       idx -= regions.size();
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
 #ifdef DEBUG_LEGION
       assert(idx < created_requirements.size());
 #endif
@@ -1876,7 +1875,7 @@ namespace Legion {
         // Otherwise we just keep going
       }
       // If none of that worked, we now get to try the created requirements
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
       for (unsigned idx = 0; idx < created_requirements.size(); idx++, index++)
       {
         LegionErrorType et = 
@@ -1999,7 +1998,7 @@ namespace Legion {
       if (index < regions.size())
         return regions[index].region;
       index -= regions.size();
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
 #ifdef DEBUG_LEGION
       assert(index < created_requirements.size());
 #endif
@@ -2047,28 +2046,16 @@ namespace Legion {
     void TaskContext::unmap_all_regions(void)
     //--------------------------------------------------------------------------
     {
-      // Can't be holding the lock when we unmap in case we block
-      std::vector<PhysicalRegion> unmap_regions;
-      {
-        AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
-        for (std::vector<PhysicalRegion>::const_iterator it = 
-              physical_regions.begin(); it != physical_regions.end(); it++)
-        {
-          if (it->impl->is_mapped())
-            unmap_regions.push_back(*it);
-        }
-        // Also unmap any of our inline mapped physical regions
-        for (LegionList<PhysicalRegion,TASK_INLINE_REGION_ALLOC>::
-              tracked::const_iterator it = inline_regions.begin();
-              it != inline_regions.end(); it++)
-        {
-          if (it->impl->is_mapped())
-            unmap_regions.push_back(*it);
-        }
-      }
-      // Perform the unmappings after we've released the lock
       for (std::vector<PhysicalRegion>::const_iterator it = 
-            unmap_regions.begin(); it != unmap_regions.end(); it++)
+            physical_regions.begin(); it != physical_regions.end(); it++)
+      {
+        if (it->impl->is_mapped())
+          it->impl->unmap_region();
+      }
+      // Also unmap any of our inline mapped physical regions
+      for (LegionList<PhysicalRegion,TASK_INLINE_REGION_ALLOC>::
+            tracked::const_iterator it = inline_regions.begin();
+            it != inline_regions.end(); it++)
       {
         if (it->impl->is_mapped())
           it->impl->unmap_region();
@@ -2244,6 +2231,13 @@ namespace Legion {
         current_fence(NULL), fence_gen(0), current_fence_index(0) 
     //--------------------------------------------------------------------------
     {
+      tree_owner_lock = Reservation::create_reservation();
+      local_field_lock = Reservation::create_reservation();
+      remote_lock = Reservation::create_reservation();
+      window_lock = Reservation::create_reservation();
+      child_op_lock = Reservation::create_reservation();
+      collective_lock = Reservation::create_reservation();
+      instance_view_lock = Reservation::create_reservation();
       // Set some of the default values for a context
       context_configuration.max_window_size = 
         Runtime::initial_task_window_size;
@@ -2291,6 +2285,16 @@ namespace Legion {
     {
       if (!remote_instances.empty())
         invalidate_remote_contexts();
+      remote_lock.destroy_reservation();
+      remote_lock = Reservation::NO_RESERVATION;
+      window_lock.destroy_reservation();
+      window_lock = Reservation::NO_RESERVATION;
+      child_op_lock.destroy_reservation();
+      child_op_lock = Reservation::NO_RESERVATION;
+      collective_lock.destroy_reservation();
+      collective_lock = Reservation::NO_RESERVATION;
+      instance_view_lock.destroy_reservation();
+      instance_view_lock = Reservation::NO_RESERVATION;
       for (std::map<TraceID,DynamicTrace*>::const_iterator it = traces.begin();
             it != traces.end(); it++)
       {
@@ -2336,6 +2340,10 @@ namespace Legion {
             runtime->forest->free_local_fields(it->first, to_free, indexes);
         }
       }
+      local_field_lock.destroy_reservation();
+      local_field_lock = Reservation::NO_RESERVATION;
+      tree_owner_lock.destroy_reservation();
+      tree_owner_lock = Reservation::NO_RESERVATION;
 #ifdef DEBUG_LEGION
       assert(pending_top_views.empty());
       assert(outstanding_subtasks == 0);
@@ -2395,7 +2403,7 @@ namespace Legion {
                                                    AddressSpaceID source)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock); 
+      AutoLock tree_lock(tree_owner_lock);
       // See if we've already assigned it
       std::map<RegionTreeNode*,std::pair<AddressSpaceID,bool> >::iterator
         finder = region_tree_owners.find(node);
@@ -2429,7 +2437,7 @@ namespace Legion {
       // otherwise we do it locally in our own context. We need
       // to hold the operation lock to look at this data structure.
       index -= owner_size;
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
 #ifdef DEBUG_LEGION
       assert(index < returnable_privileges.size());
 #endif
@@ -2465,7 +2473,7 @@ namespace Legion {
         // context has to provide global guidance about which
         // node manages the meta-data.
         index -= owner_size;
-        AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+        AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
         if ((index >= returnable_privileges.size()) || 
             returnable_privileges[index])
           return find_top_context();
@@ -2561,7 +2569,7 @@ namespace Legion {
       rez.serialize(owner_task->get_task_completion());
       rez.serialize(find_parent_context()->get_context_uid());
       // Finally pack the local field infos
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock priv_lock(privilege_lock,1,false/*exclusive*/);
       rez.serialize<size_t>(local_fields.size());
       for (std::map<FieldSpace,std::vector<LocalFieldInfo> >::const_iterator 
             it = local_fields.begin(); it != local_fields.end(); it++)
@@ -3858,6 +3866,7 @@ namespace Legion {
       {
         // See if we've exceeded our local field allocations 
         // for this field space
+        AutoLock local_lock(local_field_lock);
         std::vector<LocalFieldInfo> &infos = local_fields[space];
         if (infos.size() == Runtime::max_local_fields)
         {
@@ -3897,9 +3906,9 @@ namespace Legion {
 #endif
         // Only need the lock here when modifying since all writes
         // to this data structure are serialized
-        AutoLock ctx_lock(context_lock);
         infos.push_back(LocalFieldInfo(fid, field_size, serdez_id, 
                                        new_indexes[0], false));
+        AutoLock rem_lock(remote_lock,1,false/*exclusive*/);
         // Have to send notifications to any remote nodes
         for (std::map<AddressSpaceID,RemoteContext*>::const_iterator it = 
               remote_instances.begin(); it != remote_instances.end(); it++)
@@ -3975,6 +3984,7 @@ namespace Legion {
       {
         // See if we've exceeded our local field allocations 
         // for this field space
+        AutoLock local_lock(local_field_lock);
         std::vector<LocalFieldInfo> &infos = local_fields[space];
         if ((infos.size() + sizes.size()) > Runtime::max_local_fields)
         {
@@ -4012,12 +4022,12 @@ namespace Legion {
 #endif
         // Only need the lock here when writing since we know all writes
         // are serialized and we only need to worry about interfering readers
-        AutoLock ctx_lock(context_lock);
         const unsigned offset = infos.size();
         for (unsigned idx = 0; idx < resulting_fields.size(); idx++)
           infos.push_back(LocalFieldInfo(resulting_fields[idx], 
                      sizes[idx], serdez_id, new_indexes[idx], false));
         // Have to send notifications to any remote nodes 
+        AutoLock rem_lock(remote_lock,1,false/*exclusive*/);
         for (std::map<AddressSpaceID,RemoteContext*>::const_iterator it = 
               remote_instances.begin(); it != remote_instances.end(); it++)
         {
@@ -4996,7 +5006,7 @@ namespace Legion {
       {
         // Try taking the lock first and see if we succeed
         RtEvent precondition = 
-          Runtime::acquire_rt_reservation(context_lock, true/*exclusive*/);
+          Runtime::acquire_rt_reservation(window_lock, true/*exclusive*/);
         begin_task_wait(false/*from runtime*/);
         if (precondition.exists() && !precondition.has_triggered())
         {
@@ -5057,7 +5067,7 @@ namespace Legion {
         wait_event = window_wait;
       }
       // Release our lock now
-      context_lock.release();
+      window_lock.release();
       wait_event.lg_wait();
     }
 
@@ -5074,8 +5084,11 @@ namespace Legion {
       }
       if (!has_lock)
       {
-        RtEvent lock_acquire = Runtime::acquire_rt_reservation(context_lock,
-                                true/*exclusive*/, last_registration);
+        // In order to guarantee in order adding of the operation to 
+        // the queue we just need to guarantee ordering on acquires
+        RtEvent lock_acquire = Runtime::acquire_rt_reservation(child_op_lock,
+                                true/*exclusive*/, last_acquire_reservation);
+
         if (!lock_acquire.has_triggered())
         {
           AddToDepQueueArgs args;
@@ -5085,6 +5098,8 @@ namespace Legion {
           last_registration = 
             runtime->issue_runtime_meta_task(args, LG_RESOURCE_PRIORITY,
                                              op, lock_acquire);
+          // Now update the last acquire reservation
+          last_acquire_reservation = lock_acquire;
           return;
         }
       }
@@ -5127,7 +5142,7 @@ namespace Legion {
         dependence_precondition = next;
       }
       // Now we can release the lock
-      context_lock.release();
+      child_op_lock.release();
     }
 
     //--------------------------------------------------------------------------
@@ -5136,7 +5151,7 @@ namespace Legion {
     {
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
         std::map<Operation*,GenerationID>::iterator 
           finder = executing_children.find(op);
 #ifdef DEBUG_LEGION
@@ -5175,7 +5190,7 @@ namespace Legion {
     {
       bool needs_trigger = false;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
         std::map<Operation*,GenerationID>::iterator finder = 
           executed_children.find(op);
 #ifdef DEBUG_LEGION
@@ -5204,7 +5219,7 @@ namespace Legion {
     {
       bool needs_trigger = false;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
         std::map<Operation*,GenerationID>::iterator finder = 
           complete_children.find(op);
 #ifdef DEBUG_LEGION
@@ -5233,7 +5248,7 @@ namespace Legion {
     {
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
         // Remove it from everything and then see if we need to
         // trigger the window wait event
         executing_children.erase(op);
@@ -5355,7 +5370,7 @@ namespace Legion {
       // that is less than the index for the fence operation
       const unsigned next_fence_index = op->get_ctx_index();
       {
-        AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+        AutoLock child_lock(child_op_lock,1,false/*exclusive*/);
         for (std::map<Operation*,GenerationID>::const_iterator it = 
               executing_children.begin(); it != executing_children.end(); it++)
         {
@@ -5664,7 +5679,7 @@ namespace Legion {
     {
       ApEvent wait_on, previous;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
         const size_t current_frames = frame_events.size();
         if (current_frames > 0)
           previous = frame_events.back();
@@ -5686,7 +5701,7 @@ namespace Legion {
       // Pull off all the frame events until we reach ours
       if (context_configuration.max_outstanding_frames > 0)
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
 #ifdef DEBUG_LEGION
         assert(frame_events.front() == frame_termination);
 #endif
@@ -5707,7 +5722,7 @@ namespace Legion {
       RtEvent wait_on;
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
         if (!currently_active_context && (outstanding_subtasks == 0) && 
             (((context_configuration.min_tasks_to_schedule > 0) && 
               (pending_subtasks < 
@@ -5744,7 +5759,7 @@ namespace Legion {
       RtEvent wait_on;
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
 #ifdef DEBUG_LEGION
         assert(outstanding_subtasks > 0);
 #endif
@@ -5781,7 +5796,7 @@ namespace Legion {
       RtEvent wait_on;
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
         pending_subtasks++;
         if (currently_active_context && (outstanding_subtasks > 0) &&
             (pending_subtasks == context_configuration.min_tasks_to_schedule))
@@ -5808,7 +5823,7 @@ namespace Legion {
       if (context_configuration.min_tasks_to_schedule == 0)
         return RtEvent::NO_RT_EVENT;
       RtEvent precondition = 
-        Runtime::acquire_rt_reservation(context_lock, true/*exclusive*/);
+        Runtime::acquire_rt_reservation(child_op_lock, true/*exclusive*/);
       // If we didn't get the lock defer it
       if (!precondition.has_triggered())
       {
@@ -5842,7 +5857,7 @@ namespace Legion {
         currently_active_context = true;
       }
       // Release the lock before doing the trigger or the wait
-      context_lock.release();
+      child_op_lock.release();
       // Do anything that we need to do
       if (to_trigger.exists())
       {
@@ -5875,7 +5890,7 @@ namespace Legion {
       RtEvent wait_on;
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
         pending_frames++;
         if (currently_active_context && (outstanding_subtasks > 0) &&
             (pending_frames == context_configuration.min_frames_to_schedule))
@@ -5904,7 +5919,7 @@ namespace Legion {
       RtEvent wait_on;
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock child_lock(child_op_lock);
 #ifdef DEBUG_LEGION
         assert(pending_frames > 0);
 #endif
@@ -6028,7 +6043,7 @@ namespace Legion {
                                           DynamicCollective dc, const Future &f) 
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx(context_lock);
+      AutoLock col_lock(collective_lock);
       collective_contributions[dc.phase_barrier].push_back(f);
     }
 
@@ -6040,7 +6055,7 @@ namespace Legion {
       // Find any future contributions and record dependences for the op
       // Contributions were made to the previous phase
       ApEvent previous = Runtime::get_previous_phase(dc.phase_barrier);
-      AutoLock ctx(context_lock);
+      AutoLock col_lock(collective_lock);
       std::map<ApEvent,std::vector<Future> >::iterator finder = 
           collective_contributions.find(previous);
       if (finder == collective_contributions.end())
@@ -6269,7 +6284,7 @@ namespace Legion {
       // instance, if we do, return it, otherwise make it and save it
       RtEvent wait_on;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock inst_lock(instance_view_lock);
         std::map<PhysicalManager*,InstanceView*>::const_iterator finder = 
           instance_top_views.find(manager);
         if (finder != instance_top_views.end())
@@ -6294,7 +6309,7 @@ namespace Legion {
         // Someone else is making it so we just have to wait for it
         wait_on.lg_wait();
         // Retake the lock and read out the result
-        AutoLock ctx_lock(context_lock, 1, false/*exclusive*/);
+        AutoLock inst_lock(instance_view_lock, 1, false/*exclusive*/);
         std::map<PhysicalManager*,InstanceView*>::const_iterator finder = 
             instance_top_views.find(manager);
 #ifdef DEBUG_LEGION
@@ -6309,7 +6324,7 @@ namespace Legion {
       // view is ready
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock inst_lock(instance_view_lock);
 #ifdef DEBUG_LEGION
         assert(instance_top_views.find(manager) == 
                 instance_top_views.end());
@@ -6334,7 +6349,7 @@ namespace Legion {
     {
       InstanceView *removed = NULL;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock inst_lock(instance_view_lock);
         std::map<PhysicalManager*,InstanceView*>::iterator finder =  
           instance_top_views.find(deleted);
 #ifdef DEBUG_LEGION
@@ -6436,7 +6451,7 @@ namespace Legion {
     bool InnerContext::attempt_children_complete(void)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock chil_lock(child_op_lock);
       if (task_executed && executing_children.empty() && 
           executed_children.empty() && !children_complete_invoked)
       {
@@ -6450,7 +6465,7 @@ namespace Legion {
     bool InnerContext::attempt_children_commit(void)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock chil_lock(child_op_lock);
       if (task_executed && executing_children.empty() && 
           executed_children.empty() && complete_children.empty() && 
           !children_commit_invoked)
@@ -6628,7 +6643,7 @@ namespace Legion {
       {
         std::set<RtEvent> preconditions;
         {
-          AutoLock ctx_lock(context_lock);
+          AutoLock chil_lock(child_op_lock);
           // Only need to do this for executing and executed children
           // We know that any complete children are done
           for (std::map<Operation*,GenerationID>::const_iterator it = 
@@ -6719,7 +6734,7 @@ namespace Legion {
         pack_remote_context(rez, remote_instance);
       }
       runtime->send_remote_context_response(remote_instance, rez);
-      AutoLock ctx_lock(context_lock);
+      AutoLock rem_lock(remote_lock);
 #ifdef DEBUG_LEGION
       assert(remote_instances.find(remote_instance) == remote_instances.end());
 #endif
@@ -6773,7 +6788,7 @@ namespace Legion {
     {
       RtUserEvent to_trigger;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock tree_lock(tree_owner_lock);
 #ifdef DEBUG_LEGION
         assert(region_tree_owners.find(node) == region_tree_owners.end());
 #endif
@@ -6930,7 +6945,7 @@ namespace Legion {
 #ifdef DEBUG_LEGION
       assert(child_local.empty());
 #endif
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock local_lock(local_field_lock,1,false/*exclusive*/);
       if (local_fields.empty())
         return;
       for (std::map<FieldSpace,std::vector<LocalFieldInfo> >::const_iterator
@@ -7025,7 +7040,7 @@ namespace Legion {
       bool send_request = false;
       RtEvent wait_on;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock tree_lock(tree_owner_lock);
         std::map<RegionTreeNode*,
                  std::pair<AddressSpaceID,bool> >::const_iterator finder =
           region_tree_owners.find(node);
@@ -7065,7 +7080,7 @@ namespace Legion {
       }
       wait_on.lg_wait();
       // Retake the lock in read-only mode and get the answer
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock tree_lock(tree_owner_lock,1,false/*exclusive*/);
       std::map<RegionTreeNode*,
                std::pair<AddressSpaceID,bool> >::const_iterator finder = 
         region_tree_owners.find(node);
@@ -7346,7 +7361,7 @@ namespace Legion {
       bool send_request = false;
       RtEvent wait_on;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock tree_lock(tree_owner_lock);
         std::map<RegionTreeNode*,
                  std::pair<AddressSpaceID,bool> >::const_iterator finder =
           region_tree_owners.find(node);
@@ -7389,7 +7404,7 @@ namespace Legion {
       }
       wait_on.lg_wait();
       // Retake the lock in read-only mode and get the answer
-      AutoLock ctx_lock(context_lock,1,false/*exclusive*/);
+      AutoLock tree_lock(tree_owner_lock,1,false/*exclusive*/);
       std::map<RegionTreeNode*,
                std::pair<AddressSpaceID,bool> >::const_iterator finder = 
         region_tree_owners.find(node);
@@ -7444,7 +7459,7 @@ namespace Legion {
         RtEvent wait_on;
         RtUserEvent request;
         {
-          AutoLock ctx_lock(context_lock);
+          AutoLock rem_lock(remote_lock);
           std::map<unsigned,InnerContext*>::const_iterator finder = 
             physical_contexts.find(index);
           if (finder != physical_contexts.end())
@@ -7478,7 +7493,7 @@ namespace Legion {
         // Wait for the result to come back to us
         wait_on.lg_wait();
         // When we wake up it should be there
-        AutoLock ctx_lock(context_lock, 1, false/*exclusive*/);
+        AutoLock rem_lock(remote_lock, 1, false/*exclusive*/);
 #ifdef DEBUG_LEGION
         assert(physical_contexts.find(index) != physical_contexts.end());
 #endif
@@ -7571,7 +7586,7 @@ namespace Legion {
         std::vector<unsigned> indexes(num_local);
         {
           // Take the lock for updating this data structure
-          AutoLock ctx_lock(context_lock);
+          AutoLock local_lock(local_field_lock);
           std::vector<LocalFieldInfo> &infos = local_fields[handle];
           infos.resize(num_local);
           for (unsigned idx = 0; idx < num_local; idx++)
@@ -7637,7 +7652,7 @@ namespace Legion {
                                                     InnerContext *result)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock rem_lock(remote_lock);
 #ifdef DEBUG_LEGION
       assert(physical_contexts.find(index) == physical_contexts.end());
 #endif
@@ -7679,6 +7694,7 @@ namespace Legion {
       : TaskContext(rt, owner, owner->regions)
     //--------------------------------------------------------------------------
     {
+      leaf_lock = Reservation::create_reservation();
     }
 
     //--------------------------------------------------------------------------
@@ -7694,6 +7710,8 @@ namespace Legion {
     LeafContext::~LeafContext(void)
     //--------------------------------------------------------------------------
     {
+      leaf_lock.destroy_reservation();
+      leaf_lock = Reservation::NO_RESERVATION;
     }
 
     //--------------------------------------------------------------------------
@@ -7732,7 +7750,7 @@ namespace Legion {
     bool LeafContext::attempt_children_complete(void)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock leaf(leaf_lock);
       if (!children_complete_invoked)
       {
         children_complete_invoked = true;
@@ -7745,7 +7763,7 @@ namespace Legion {
     bool LeafContext::attempt_children_commit(void)
     //--------------------------------------------------------------------------
     {
-      AutoLock ctx_lock(context_lock);
+      AutoLock leaf(leaf_lock);
       if (!children_commit_invoked)
       {
         children_commit_invoked = true;
@@ -9040,9 +9058,8 @@ namespace Legion {
       single_task->handle_future(res, res_size, owned);
       bool need_complete = false;
       bool need_commit = false;
-      std::vector<PhysicalRegion> unmap_regions;
       {
-        AutoLock ctx_lock(context_lock);
+        AutoLock leaf(leaf_lock);
 #ifdef DEBUG_LEGION
         assert(!task_executed);
 #endif
@@ -9059,23 +9076,15 @@ namespace Legion {
           need_commit = true;
           children_commit_invoked = true;
         }
-        // Finally unmap any physical regions that we mapped
-#ifdef DEBUG_LEGION
-        assert((regions.size() + 
-                  created_requirements.size()) == physical_regions.size());
-#endif
-        for (std::vector<PhysicalRegion>::const_iterator it = 
-              physical_regions.begin(); it != physical_regions.end(); it++)
-        {
-          if (it->impl->is_mapped())
-            unmap_regions.push_back(*it);
-        }
       }
-      // Do the unmappings while not holding the lock in case we block
-      if (!unmap_regions.empty())
+#ifdef DEBUG_LEGION
+      assert((regions.size() + 
+            created_requirements.size()) == physical_regions.size());
+#endif
+      for (std::vector<PhysicalRegion>::const_iterator it = 
+          physical_regions.begin(); it != physical_regions.end(); it++)
       {
-        for (std::vector<PhysicalRegion>::const_iterator it = 
-              unmap_regions.begin(); it != unmap_regions.end(); it++)
+        if (it->impl->is_mapped())
           it->impl->unmap_region();
       }
       // Mark that we are done executing this operation
