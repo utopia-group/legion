@@ -312,6 +312,7 @@ namespace Legion {
       virtual void end_static_trace(void) = 0;
       virtual void record_previous_trace(LegionTrace *trace) = 0;
       virtual bool check_trace_recurrent(LegionTrace *trace) const = 0;
+      virtual void invalidate_trace_cache(void) = 0;
     public:
       virtual void issue_frame(FrameOp *frame, ApEvent frame_termination) = 0;
       virtual void perform_frame_issue(FrameOp *frame, 
@@ -887,6 +888,7 @@ namespace Legion {
       virtual void end_static_trace(void);
       virtual void record_previous_trace(LegionTrace *trace);
       virtual bool check_trace_recurrent(LegionTrace *trace) const;
+      virtual void invalidate_trace_cache(void);
     public:
       virtual void issue_frame(FrameOp *frame, ApEvent frame_termination);
       virtual void perform_frame_issue(FrameOp *frame, 
@@ -1410,6 +1412,7 @@ namespace Legion {
       virtual void end_static_trace(void);
       virtual void record_previous_trace(LegionTrace *trace);
       virtual bool check_trace_recurrent(LegionTrace *trace) const;
+      virtual void invalidate_trace_cache(void);
     public:
       virtual void issue_frame(FrameOp *frame, ApEvent frame_termination);
       virtual void perform_frame_issue(FrameOp *frame, 
@@ -1714,6 +1717,7 @@ namespace Legion {
       virtual void end_static_trace(void);
       virtual void record_previous_trace(LegionTrace *trace);
       virtual bool check_trace_recurrent(LegionTrace *trace) const;
+      virtual void invalidate_trace_cache(void);
     public:
       virtual void issue_frame(FrameOp *frame, ApEvent frame_termination);
       virtual void perform_frame_issue(FrameOp *frame, 
