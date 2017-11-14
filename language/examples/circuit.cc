@@ -258,7 +258,7 @@ void CircuitMapper::map_task(const MapperContext      ctx,
         continue;
 
       // Create instances for reduction
-      if (input.valid_instances[idx].size() == 0) {
+      if (req.privilege == REDUCE) {
         // FIXME: Would be nice to make this more efficient
         const TaskLayoutConstraintSet &layout_constraints =
           runtime->find_task_layout_constraints(ctx,
