@@ -2305,6 +2305,19 @@ static void *bytedup(const void *data, size_t datalen)
           // don't migrate a barrier more than once though (i.e. only if it's on the creator node still)
 	  // also, do not migrate a barrier if we have any local involvement in future generations
 	  //  (either arrivals or waiters)
+         // HACK: if we have no local or remote waiters, and the arrival count
+         //  is 1, and the arriver is nonlocal, we want to try migrating the
+         //  barrier to the sender, but we need to also make sure they get
+         //  a notification, so kill two birds with one stone by making the
+         //  sender the (only) remote notification request
+         if(local_notifications.empty() && remote_notifications.empty() &&
+            generations.empty() && (sender != gasnet_mynode()) &&
+            (ID(me).barrier.creator_node == gasnet_mynode())) {
+           remote_notifications.resize(1);
+           remote_notifications[0].node = sender;
+           remote_notifications[0].previous_gen = 0;
+           remote_notifications[0].trigger_gen = generation;
+         }
 	  if(local_notifications.empty() && (remote_notifications.size() == 1) &&
 	     generations.empty() &&
              (ID(me).barrier.creator_node == gasnet_mynode())) {
