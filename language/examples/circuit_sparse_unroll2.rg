@@ -892,7 +892,7 @@ task toplevel()
       end
       --__demand(__parallel)
       for i = 0, num_superpieces do
-        update_voltages(j == num_loops - 1, rp_private[i], rp_shared[i])
+        update_voltages(j + k == num_loops - 1, rp_private[i], rp_shared[i])
       end
     end
 
