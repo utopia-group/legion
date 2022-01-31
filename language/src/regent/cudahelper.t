@@ -18,6 +18,7 @@ local config = require("regent/config").args()
 local data = require("common/data")
 local profile = require("regent/profile")
 local report = require("common/report")
+local ffi = require("ffi")
 
 local cudahelper = {}
 
@@ -234,6 +235,19 @@ end
 -- #################
 
 local terra register_ptx(ptxc : rawstring) : &&opaque
+  -----
+  var fn = [os.getenv("DUMPFILE") or ""]
+  if fn ~= "" then
+      c.printf("dumping PTX to %s!\n", fn)
+      var fd = c.fopen(fn, "w")
+      if fd == nil then
+          c.perror("dumping PTX")
+      else
+          c.fputs(ptxc, fd)
+          c.fclose(fd)
+      end
+  end
+  ----
   var fat_bin : &fat_bin_t
   var fat_size = sizeof(fat_bin_t)
   -- TODO: this line is leaking memory
@@ -247,6 +261,9 @@ local terra register_ptx(ptxc : rawstring) : &&opaque
 end
 
 local terra register_cubin(cubin : rawstring) : &&opaque
+  -----
+  terralib.traceback(nil)
+  ----
   var fat_bin : &fat_bin_t
   var fat_size = sizeof(fat_bin_t)
   -- TODO: this line is leaking memory
@@ -1291,15 +1308,26 @@ end
 function cudahelper.codegen_kernel_call(cx, kernel_id, count, args, shared_mem_size, tight)
   local setupArguments = terralib.newlist()
 
+  ---
+  print("codegen for kernel ", kernel_id, "... begin arguments:")
+  ---
+
   local offset = 0
   for i = 1, #args do
     local arg =  args[i]
     local size = terralib.sizeof(arg.type)
+    ---
+    print(arg)
+    ---
     setupArguments:insert(quote
       ExecutionAPI.cudaSetupArgument(&[arg], size, offset)
     end)
     offset = offset + size
   end
+
+  ---
+  print("end arguments")
+  ---
 
   local grid = terralib.newsymbol(RuntimeAPI.dim3, "grid")
   local block = terralib.newsymbol(RuntimeAPI.dim3, "block")
@@ -1347,6 +1375,10 @@ function cudahelper.codegen_kernel_call(cx, kernel_id, count, args, shared_mem_s
   return quote
     if [count] > 0 then
       var [grid], [block]
+      c.printf("grid: %d,%d,%d\n", [grid].x, [grid].y, [grid].z)
+      c.printf("block: %d,%d,%d\n", [block].x, [block].y, [block].z)
+      c.printf("shared_mem_size: %d\n", shared_mem_size)
+      c.printf("kernel_id: %s\n\n", [&int8](kernel_id))
       [launch_domain_init]
       ExecutionAPI.cudaConfigureCall([grid], [block], shared_mem_size, nil)
       [setupArguments]
