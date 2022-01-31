@@ -421,6 +421,44 @@ function cudahelper.jit_compile_kernels_and_register(kernels)
     register = quote
       var [handle] = register_ptx(ptxc)
     end
+    print("module is of type " .. type(module))
+    print("ptx is of type " .. type(ptx))
+    print("ptxc is of type " .. type(ptxc))
+    print()
+    for key,value in pairs(module) do
+        local fn = key .. ".t"
+        c.printf("dumping terra function to %s!\n", fn)
+        local fd = c.fopen(fn, "w")
+        if fd == nil then
+            c.perror("dumping PTX")
+        else
+            c.fputs(tostring(value), fd)
+            c.fclose(fd)
+        end
+        local ptx_kernel = cudalib.toptx({ [key] = value }, nil, version)
+        fn = key .. ".ptx"
+        c.printf("dumping ptx kernel to %s!\n", fn)
+        local fd = c.fopen(fn, "w")
+        if fd == nil then
+            c.perror("dumping PTX")
+        else
+            c.fputs(tostring(ptx_kernel), fd)
+            c.fclose(fd)
+        end
+    end
+    print()
+    for key,value in pairs(ptxc) do
+        local fn = key .. ".out"
+        c.printf("dumping ptx function to %s!\n", fn)
+        local fd = c.fopen(fn, "w")
+        if fd == nil then
+            c.perror("dumping PTX")
+        else
+            c.fputs(tostring(value), fd)
+            c.fclose(fd)
+        end
+    end
+    print()
   else
     local cubin = terralib.constant(cubin)
     register = quote
